@@ -1,10 +1,15 @@
-import os
 import fitz  # PyMuPDF
 from PIL import Image
+import os
 import pytesseract
 
-# Configuração do pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+# Caminho relativo ao executável do Tesseract no projeto
+tesseract_path = os.path.join(os.path.dirname(__file__), "tesseract", "tesseract.exe")
+pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+# Define o caminho do diretório "tessdata" onde estão os arquivos .traineddata
+tessdata_dir = os.path.join(os.path.dirname(__file__), "tesseract", "tessdata")
+os.environ["TESSDATA_PREFIX"] = tessdata_dir  # Configura a variável de ambiente
 
 def extract_text_from_pdf_with_ocr(pdf_path, output_dir):
     # Carrega o PDF
@@ -29,20 +34,3 @@ def extract_text_from_pdf_with_ocr(pdf_path, output_dir):
         f.write(all_text)
 
     pdf_document.close()
-
-def process_pdfs_in_directory_with_ocr(input_dir, output_dir):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    for file_name in os.listdir(input_dir):
-        if file_name.lower().endswith(".pdf"):
-            pdf_path = os.path.join(input_dir, file_name)
-            print(f"Processando com OCR: {file_name}")
-            extract_text_from_pdf_with_ocr(pdf_path, output_dir)
-
-if __name__ == "__main__":
-    input_directory = "./pdfs"  # Diretório de entrada
-    output_directory = "./output"  # Diretório de saída
-
-    process_pdfs_in_directory_with_ocr(input_directory, output_directory)
-    print("Processamento com OCR concluído!")
