@@ -1,6 +1,6 @@
 import sys
 import os
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, Qt
+from PyQt5.QtCore import QThread, pyqtSignal, QMutex, Qt, QMutex, QMutexLocker
 from main import extract_text_from_pdf_with_ocr
 
 from PyQt5.QtWidgets import (
@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 
 class PDFProcessorThread(QThread):
-    progress = pyqtSignal(int, int)  # Envia progresso e quantidade de arquivos processados
+    progress = pyqtSignal(int, int)
     finished = pyqtSignal()
     canceled = pyqtSignal()
 
@@ -23,7 +23,6 @@ class PDFProcessorThread(QThread):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        # Lista apenas os arquivos PDF no diretório
         files = [
             file_name for file_name in os.listdir(self.input_dir)
             if file_name.lower().endswith(".pdf")
@@ -35,7 +34,6 @@ class PDFProcessorThread(QThread):
             self.finished.emit()
             return
 
-        # Processa cada arquivo PDF no diretório
         for i, file_name in enumerate(files):
             self.mutex.lock()
             if self.cancel:
@@ -46,6 +44,13 @@ class PDFProcessorThread(QThread):
 
             pdf_path = os.path.join(self.input_dir, file_name)
             try:
+                self.mutex.lock()
+                if self.cancel:
+                    self.canceled.emit()
+                    self.mutex.unlock()
+                    return
+                self.mutex.unlock()
+
                 extract_text_from_pdf_with_ocr(pdf_path, self.output_dir)
             except Exception as e:
                 print(f"Erro ao processar {file_name}: {e}")
@@ -55,10 +60,8 @@ class PDFProcessorThread(QThread):
         self.finished.emit()
 
     def stop(self):
-        self.mutex.lock()
-        self.cancel = True
-        self.mutex.unlock()
-
+        with QMutexLocker(self.mutex):
+            self.cancel = True
 
 class PDFProcessorApp(QMainWindow):
     def __init__(self):
@@ -91,7 +94,6 @@ class PDFProcessorApp(QMainWindow):
         self.statusLabel = QLabel("", self)
         layout.addWidget(self.statusLabel)
 
-        # Layout superior direito para exibir arquivos processados/total
         self.filesLabel = QLabel("0/0", self)
         self.filesLabel.setAlignment(Qt.AlignRight)
         layout.addWidget(self.filesLabel)
@@ -106,7 +108,6 @@ class PDFProcessorApp(QMainWindow):
             self.input_folder = folder
             self.label.setText(f"Pasta selecionada: {folder}")
 
-            # Lista os PDFs na pasta
             self.files = [
                 file_name for file_name in os.listdir(self.input_folder)
                 if file_name.lower().endswith(".pdf")
@@ -158,6 +159,7 @@ class PDFProcessorApp(QMainWindow):
     def cancel_processing(self):
         self.thread.stop()
         self.processButton.setEnabled(False)
+        self.statusLabel.setText("Cancelando o processamento...")
 
     def reset_ui(self):
         self.progressBar.setVisible(False)
@@ -165,7 +167,6 @@ class PDFProcessorApp(QMainWindow):
         self.processButton.setText("Processar PDFs")
         self.processButton.setEnabled(True)
         self.selectButton.setEnabled(True)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
