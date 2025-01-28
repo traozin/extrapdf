@@ -17,7 +17,7 @@ def extract_text_from_pdf_with_ocr(pdf_path, output_dir):
         page = pdf_document.load_page(page_num)
         all_text += f"\n\n--- Página {page_num + 1} ---\n\n"
 
-        pix = page.get_pixmap(dpi=300)
+        pix = page.get_pixmap(dpi=75)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
         text = pytesseract.image_to_string(img, lang="por")
