@@ -1,6 +1,6 @@
 import sys
 import os
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, Qt, QMutex, QMutexLocker
+from PyQt5.QtCore import QThread, pyqtSignal, QMutex, Qt, QMutex, QMutexLocker, QTimer
 from main import extract_text_from_pdf_with_ocr
 
 from PyQt5.QtWidgets import (
@@ -94,6 +94,10 @@ class PDFProcessorApp(QMainWindow):
         self.statusLabel = QLabel("", self)
         layout.addWidget(self.statusLabel)
 
+        self.timerLabel = QLabel("Tempo decorrido: 00:00:00", self)
+        self.timerLabel.setVisible(False)
+        layout.addWidget(self.timerLabel)
+
         self.filesLabel = QLabel("0/0", self)
         self.filesLabel.setAlignment(Qt.AlignRight)
         layout.addWidget(self.filesLabel)
@@ -101,6 +105,10 @@ class PDFProcessorApp(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_timer)
+        self.elapsed_seconds = 0
 
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Selecione uma pasta")
@@ -133,6 +141,10 @@ class PDFProcessorApp(QMainWindow):
         output_dir = os.path.join(self.input_folder, "output")
         self.statusLabel.setText("Processando...")
         self.progressBar.setVisible(True)
+        self.timerLabel.setVisible(True)
+
+        self.elapsed_seconds = 0
+        self.timer.start(1000)
 
         self.thread = PDFProcessorThread(self.input_folder, output_dir)
         self.thread.progress.connect(self.update_progress)
@@ -148,25 +160,36 @@ class PDFProcessorApp(QMainWindow):
         self.statusLabel.setText(f"Processando... {processed_files}/{len(self.files)} arquivos concluídos.")
         self.filesLabel.setText(f"{processed_files}/{len(self.files)}")
 
+    def update_timer(self):
+        self.elapsed_seconds += 1
+        hours, remainder = divmod(self.elapsed_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        self.timerLabel.setText(f"Tempo decorrido: {hours:02}:{minutes:02}:{seconds:02}")
+
     def processing_finished(self):
+        self.timer.stop()
         self.statusLabel.setText("Processamento concluído!")
-        self.reset_ui()
+        self.reset_ui(keep_timer=True)
 
     def processing_canceled(self):
+        self.timer.stop()
         self.statusLabel.setText("Processamento cancelado!")
-        self.reset_ui()
+        self.reset_ui(keep_timer=False)
 
     def cancel_processing(self):
         self.thread.stop()
         self.processButton.setEnabled(False)
         self.statusLabel.setText("Cancelando o processamento...")
 
-    def reset_ui(self):
+    def reset_ui(self, keep_timer=False):
         self.progressBar.setVisible(False)
         self.progressBar.setValue(0)
         self.processButton.setText("Processar PDFs")
         self.processButton.setEnabled(True)
         self.selectButton.setEnabled(True)
+        if not keep_timer:
+            self.timerLabel.setVisible(False)
+            self.timerLabel.setText("Tempo decorrido: 00:00:00")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
